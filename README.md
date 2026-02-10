@@ -56,7 +56,7 @@ TripNoteは、旅行ごとの予定（しおり）と出費を一元管理でき
 ## 使用技術（予定）
 
 - フロントエンド：Next.js / React
-- バックエンド：Express / API Routes
+- バックエンド：python / FastAPI
 - データベース：Firestore
 - 認証：Firebase Authentication
 
