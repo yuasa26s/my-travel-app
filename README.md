@@ -51,7 +51,7 @@ TripNoteは、旅行ごとの予定（しおり）と出費を一元管理でき
 - [機能一覧](docs/feature-list.md)
 - [DB設計](docs/db-design.md)
 - [データ項目定義](docs/field-definition.md)
-
+- [プロジェクト全体の構成設計](docs/directory-structure.md)
 
 ---
 
