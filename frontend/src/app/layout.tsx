@@ -1,39 +1,14 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import type { ReactNode } from "react";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "Travel App",
-  description: "旅行のしおりと出費をまとめて管理できるアプリ",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ja">
-      <body
-        style={{
-          backgroundColor: "#f0f8ff",
-          minHeight: "100vh",
-        }}
-      >
-        <header style={{ padding: "16px", borderBottom: "1px solid #ccc" }}>
+      <body className="min-h-screen bg-gradient-to-b from-sky-200 via-sky-100 to-white">
+        <header className="p-6 text-lg font-semibold text-gray-700">
           ✈️ Travel App
         </header>
-        <main style={{ padding: "24px" }}>{children}</main>
+        <main className="px-6 pb-16">{children}</main>
       </body>
     </html>
   );

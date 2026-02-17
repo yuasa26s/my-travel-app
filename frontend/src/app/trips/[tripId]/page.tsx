@@ -1,12 +1,18 @@
-const mockSchedules = [
-  { id: 1, title: "1日目：観光", time: "10:00 - 17:00" },
-  { id: 2, title: "2日目：テーマパーク", time: "09:00 - 18:00" },
-];
+export default async function ScheduleDetailPage({
+  params,
+}: {
+  params: { tripId: string; scheduleId: string };
+}) {
+  const { tripId, scheduleId } = params;
 
-export default function SchedulePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-100 to-white p-8">
-      <h1 className="text-2xl font-bold mb-6">京都旅行 1日目</h1>
+    <div className="max-w-3xl mx-auto mt-10">
+      <div className="bg-white/60 backdrop-blur-md rounded-2xl shadow-md p-8">
+        <h1 className="text-2xl font-bold text-gray-800 mb-4">
+          Trip ID: {tripId}
+        </h1>
+        <h2 className="text-lg text-gray-600">Schedule ID: {scheduleId}</h2>
+      </div>
     </div>
   );
 }
