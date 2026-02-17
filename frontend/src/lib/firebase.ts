@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
-# TODO: fairebaseコンソールから取得して入力のこと！
+// # TODO: fairebaseコンソールから取得して入力のこと！
 const firebaseConfig = {
   apiKey: "xxx",
   authDomain: "xxx",

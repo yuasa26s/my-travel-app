@@ -1,20 +1,28 @@
-# TODO API関数を先に作った。keyの入力をすること。
-
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-export const fetchTrips = async () => {
+// # 今はGETのみ。apiが繋がった事を確認したらディレクトリにわける。
+// -------- Trips --------
+export const getTrips = async () => {
   const res = await fetch(`${BASE_URL}/api/trips`);
   if (!res.ok) throw new Error("Failed to fetch trips");
   return res.json();
 };
 
-export const fetchSchedules = async (tripId: string) => {
+export const getTrip = async (tripId: string) => {
+  const res = await fetch(`${BASE_URL}/api/trips/${tripId}`);
+  if (!res.ok) throw new Error("Failed to fetch trip");
+  return res.json();
+};
+
+// -------- Schedules --------
+export const getSchedules = async (tripId: string) => {
   const res = await fetch(`${BASE_URL}/api/schedules?tripId=${tripId}`);
   if (!res.ok) throw new Error("Failed to fetch schedules");
   return res.json();
 };
 
-export const fetchExpenses = async (tripId: string) => {
+// -------- Expenses --------
+export const getExpenses = async (tripId: string) => {
   const res = await fetch(`${BASE_URL}/api/expenses?tripId=${tripId}`);
   if (!res.ok) throw new Error("Failed to fetch expenses");
   return res.json();
