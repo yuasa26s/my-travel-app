@@ -4,6 +4,9 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 // -------- Trips --------
 export const getTrips = async () => {
   const res = await fetch(`${BASE_URL}/api/trips`);
+
+  console.log("BASE_URL:", BASE_URL);
+
   if (!res.ok) throw new Error("Failed to fetch trips");
   return res.json();
 };

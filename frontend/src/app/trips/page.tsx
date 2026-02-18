@@ -17,10 +17,12 @@ export default function TripsPage() {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-4">旅行一覧</h1>
 
-      {/* テストの為一時的にJSON表示 */}
-      <pre>{JSON.stringify(trips, null, 2)}</pre>
-
-      {/* あとでTripCardに差し替える */}
+      {trips.map((trip) => (
+        <div key={trip.id}>
+          <h2>{trip.title}</h2>
+          <p>ID: {trip.id}</p>
+        </div>
+      ))}
     </div>
   );
 }
