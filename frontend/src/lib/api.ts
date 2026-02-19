@@ -26,7 +26,7 @@ export const getSchedules = async (tripId: string) => {
 
 // -------- Expenses --------
 export const getExpenses = async (tripId: string) => {
-  const res = await fetch(`${BASE_URL}/api/expenses?tripId=${tripId}`);
+  const res = await fetch(`${BASE_URL}/api/expenses/trips/${tripId}/expenses`);
   if (!res.ok) throw new Error("Failed to fetch expenses");
   return res.json();
 };
