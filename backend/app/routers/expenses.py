@@ -37,3 +37,23 @@ async def get_trip_expense_summary(trip_id: str):
 async def get_expenses(tripId: str = Query(...)):
     # 上の関数と同じロジック、または共通化して呼び出す
     return await get_trip_expense_summary(tripId)
+
+
+@router.post("/calculate/{trip_id}")
+async def calculate_expenses(trip_id: str):
+    # 1. trip_id に紐づく出費一覧をFirestoreから取得
+    expenses = db.collection("expenses").where("trip_id", "==", trip_id).stream()
+    
+    total = sum([e.to_dict()['amount'] for e in expenses])
+    
+    # 2. 旅行の参加人数を取得（例: 3人）
+    member_count = 3 
+    
+    # 3. 割り勘計算
+    per_person = total / member_count
+    
+    return {
+        "total_amount": total,
+        "per_person": per_person,
+        "currency": "JPY"
+    }
