@@ -1,16 +1,26 @@
 # backend/app/main.py
 from fastapi import FastAPI
-from app.routers import auth, trips, expenses # expensesを追加
+from fastapi.middleware.cors import CORSMiddleware
+from app.routers import auth, trips, expenses
+from app.core import config # ← Firebase設定
 
-# 1. まず app を作る（これより下で app を使う必要があります）
-app = FastAPI()
+# 1. app の作成
+app = FastAPI(title="Trip Shiori API")
 
-# 2. そのあとで router を登録する
+# 2. CORSの設定（フロントエンドとの連携に必須！）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 3. Router の登録
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(trips.router, prefix="/api/trips", tags=["Trips"])
-app.include_router(expenses.router, prefix="/api/expenses", tags=["Expenses"]) # これを追加
+app.include_router(expenses.router, prefix="/api/expenses", tags=["Expenses"])
 
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Trip Shiori API"}
-
