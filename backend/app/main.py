@@ -7,14 +7,7 @@ from app.core import config # ← Firebase設定
 # 1. app の作成
 app = FastAPI(title="Trip Shiori API")
 
-# 2. CORSの設定（フロントエンドとの連携に必須！）
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
 
 # 3. Router の登録
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
