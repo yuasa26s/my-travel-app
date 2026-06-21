@@ -5,8 +5,9 @@ from app.core.config import db
 from datetime import datetime
 from app.services.gemini import generate_travel_plan
 
-# ★ Firestore固有の前提条件エラーをキャッチするために追加
+# ★ Firestore固有の前提条件エラーや配列操作のためにインポートを追加
 from google.api_core.exceptions import FailedPrecondition
+from firebase_admin import firestore as admin_firestore
 import logging
 
 # ログを出力するための設定
@@ -31,6 +32,11 @@ class PlanCreate(BaseModel):
     budget: str
     companion: str
     uid: str          # 追加: どのユーザーが作成したかを識別するID
+
+# 💰 💡 追加：出費登録用のデータモデル
+class ExpenseCreate(BaseModel):
+    memo: str     # 例: "ホテル代"
+    amount: int   # 例: 15000
 
 @app.get("/")
 def read_root():
@@ -62,6 +68,7 @@ def create_travel_plan(plan: PlanCreate):
             "summary": ai_generated_content.get("summary", ""),
             "schedule": ai_generated_content.get("schedule", []),
             "souvenirs": ai_generated_content.get("souvenirs", []),
+            "expenses": [],              # 💰 💡 初回生成時に空の出費配列を用意しておく
             "created_at": datetime.utcnow()
         }
         doc_ref.set(plan_data)
@@ -126,4 +133,37 @@ def delete_travel_plan(plan_id: str):
         raise he
     except Exception as e:
         logger.error(f"❌【プラン削除エラー】: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 4. 💰 💡 追加：特定のプランに出費を追加するAPI
+@app.post("/plans/{plan_id}/expenses")
+def add_expense(plan_id: str, expense: ExpenseCreate):
+    try:
+        doc_ref = db.collection("plans").document(plan_id)
+        plan_snap = doc_ref.get()
+        
+        if not plan_snap.exists:
+            raise HTTPException(status_code=404, detail="指定されたプランが見つかりません。")
+            
+        # 削除・特定時に利用するユニークIDをタイムスタンプベースで簡易生成
+        expense_id = f"exp_{int(datetime.utcnow().timestamp())}"
+        
+        expense_data = {
+            "id": expense_id,
+            "memo": expense.memo,
+            "amount": expense.amount
+        }
+        
+        # ArrayUnionを使って既存の配列を壊さず末尾に安全にプッシュ追加する
+        doc_ref.update({
+            "expenses": admin_firestore.ArrayUnion([expense_data])
+        })
+        
+        return {"status": "Success", "data": expense_data}
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"❌【出費追加エラー】: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
