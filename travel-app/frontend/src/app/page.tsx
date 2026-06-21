@@ -15,6 +15,13 @@ interface ScheduleItem {
   spot: string;
 }
 
+// 💰 出費データの型定義を追加
+interface ExpenseItem {
+  id: string;
+  memo: string;
+  amount: number;
+}
+
 interface TripPlan {
   id: string;
   title: string;
@@ -25,6 +32,7 @@ interface TripPlan {
   companion?: string;
   days?: number;
   schedule?: ScheduleItem[];
+  expenses?: ExpenseItem[]; // 💰 出費配列の定義を追加
 }
 
 export default function Home() {
@@ -156,6 +164,48 @@ export default function Home() {
       alert("通信エラーが発生しました。");
     }
   };
+
+  // 💰 💡 追加：出費をバックエンドに送信し、フロント状態を同期する処理
+  const handleAddExpense = async (planId: string, memo: string, amount: number) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/plans/${planId}/expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memo, amount }),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        const newExpense = result.data;
+
+        // 1. 現在開いている詳細モーダル（selectedPlan）の状態をリロードなしで更新
+        setSelectedPlan((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            expenses: [...(prev.expenses || []), newExpense]
+          };
+        });
+
+        // 2. 親の一覧画面（tripPlans）のデータも同期して更新（不整合を防ぐ）
+        setTripPlans((prevPlans) =>
+          prevPlans.map((plan) =>
+            plan.id === planId
+              ? { ...plan, expenses: [...(plan.expenses || []), newExpense] }
+              : plan
+          )
+        );
+      } else {
+        alert("出費の登録に失敗しました。");
+      }
+    } catch (error) {
+      console.error("出費登録エラー:", error);
+      alert("通信エラーが発生しました。");
+    }
+  };
+
+  // 💰 💡 モーダル内の現在選択されているプランの出費総額を自動計算
+  const totalExpense = selectedPlan?.expenses?.reduce((sum, item) => sum + item.amount, 0) || 0;
 
   if (loading) {
     return (
@@ -297,14 +347,12 @@ export default function Home() {
               ) : (
                 <div className="grid gap-4">
                   {tripPlans.map((plan) => (
-                    /* ★ カード全体をクリック可能にし、ホバーで少し浮くエフェクトを追加 */
                     <div 
                       key={plan.id} 
                       onClick={() => setSelectedPlan(plan)}
                       className="border border-gray-100 rounded-xl p-4 bg-gray-50 flex justify-between items-start shadow-sm cursor-pointer hover:bg-sky-50/40 hover:border-sky-200 transition-all group"
                     >
                       <div className="flex-1">
-                        {/* ★ タイトルにホバー時アンダーラインがつくように変更 */}
                         <h3 className="font-bold text-base text-gray-800 mb-1 group-hover:text-sky-600 transition-colors">
                           {plan.title || `${plan.destination}の旅`}
                         </h3>
@@ -343,7 +391,7 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-gray-100 flex flex-col">
             {/* モーダルヘッダー */}
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between z-10">
               <h3 className="text-lg font-bold text-gray-800">📋 しおり詳細</h3>
               <button 
                 onClick={() => setSelectedPlan(null)}
@@ -408,6 +456,76 @@ export default function Home() {
                   <p className="text-gray-400 text-xs italic">スケジュール情報がありません。</p>
                 )}
               </div>
+
+              {/* 💰 💡 追加：出費管理セクション */}
+              <div className="mt-4 border-t border-gray-100 pt-6">
+                <h4 className="font-bold text-gray-800 text-sm mb-4 flex items-center gap-1.5 border-b border-gray-100 pb-1.5">
+                  💰 出費の記録・合計計算
+                </h4>
+                
+                {/* 出費登録用インラインフォーム */}
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const form = e.currentTarget;
+                    const formData = new FormData(form);
+                    const memo = formData.get("memo") as string;
+                    const amount = parseInt(formData.get("amount") as string, 10);
+                    
+                    if (memo && !isNaN(amount)) {
+                      handleAddExpense(selectedPlan.id, memo, amount);
+                      form.reset(); // 送信後に入力欄をクリア
+                    }
+                  }} 
+                  className="flex gap-2 mb-4"
+                >
+                  <input 
+                    type="text" 
+                    name="memo" 
+                    placeholder="例: ホテル代、レンタカー" 
+                    required 
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-800 focus:outline-sky-500"
+                  />
+                  <input 
+                    type="number" 
+                    name="amount" 
+                    placeholder="金額 (円)" 
+                    min={0}
+                    required 
+                    className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-800 focus:outline-sky-500"
+                  />
+                  <button 
+                    type="submit" 
+                    className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-500 transition-colors whitespace-nowrap"
+                  >
+                    追加
+                  </button>
+                </form>
+
+                {/* 登録済み出費リスト */}
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  <ul className="divide-y divide-gray-200/60 max-h-40 overflow-y-auto mb-3">
+                    {selectedPlan.expenses?.map((item) => (
+                      <li key={item.id} className="py-2 flex justify-between text-xs text-gray-700">
+                        <span className="text-gray-600 font-medium">{item.memo}</span>
+                        <span className="font-bold text-gray-800">{item.amount.toLocaleString()} 円</span>
+                      </li>
+                    ))}
+                    {(!selectedPlan.expenses || selectedPlan.expenses.length === 0) && (
+                      <p className="text-gray-400 text-xs italic text-center py-2">
+                        登録された出費データはまだありません。
+                      </p>
+                    )}
+                  </ul>
+
+                  {/* 🔥 金額の合計表示 */}
+                  <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
+                    <span className="text-xs font-bold text-gray-500">現在の出費合計:</span>
+                    <span className="text-lg font-black text-sky-600">{totalExpense.toLocaleString()} 円</span>
+                  </div>
+                </div>
+              </div>
+
             </div>
 
             {/* モーダルお尻の閉じるボタン */}
