@@ -1,7 +1,8 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage"; // 👈 1. getStorage をインポートに追加
 
-// 先ほど取得した実際の値が、.env.localからここに自動で注入されます
+// 先ほど取得した実際の値が、.env.localからここに自動で注入される
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -14,6 +15,7 @@ const firebaseConfig = {
 // Next.jsの再読み込みで二重に初期化されるのを防ぐコード
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// page.tsx で使うために auth をエクスポートする
+// 使うために各サービスをエクスポートする
 export const auth = getAuth(app);
+export const storage = getStorage(app); // 👈 2. storage を初期化してエクスポート
 export { app };

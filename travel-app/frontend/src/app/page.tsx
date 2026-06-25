@@ -8,14 +8,16 @@ import {
   onAuthStateChanged, 
   User 
 } from "firebase/auth";
-import { auth } from "../lib/firebase"; 
+// 📸 💡 Cloud Storage 関連のメソッドと storage インスタンスをインポート
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { auth, storage } from "../lib/firebase"; 
 
 interface ScheduleItem {
   time: string;
   spot: string;
 }
 
-// 💰 出費データの型定義を追加
+// 💰 出費データの型定義
 interface ExpenseItem {
   id: string;
   memo: string;
@@ -32,7 +34,8 @@ interface TripPlan {
   companion?: string;
   days?: number;
   schedule?: ScheduleItem[];
-  expenses?: ExpenseItem[]; // 💰 出費配列の定義を追加
+  expenses?: ExpenseItem[]; // 💰 出費配列
+  image_urls?: string[];    // 📸 💡 画像URL配列の定義を追加
 }
 
 export default function Home() {
@@ -50,6 +53,8 @@ export default function Home() {
 
   // ★ 詳細表示モーダル用の状態管理
   const [selectedPlan, setSelectedPlan] = useState<TripPlan | null>(null);
+  // 📸 💡 画像アップロード中のローディング状態
+  const [isUploading, setIsUploading] = useState(false);
 
   // 1. Firebaseのログイン状態を監視
   useEffect(() => {
@@ -143,7 +148,6 @@ export default function Home() {
 
   // 6. プランの削除処理
   const handleDeletePlan = async (id: string, e: React.MouseEvent) => {
-    // モーダルが開くのを防ぐ
     e.stopPropagation();
     if (!confirm("この旅行プランを削除してもよろしいですか？")) return;
     
@@ -165,7 +169,7 @@ export default function Home() {
     }
   };
 
-  // 💰 💡 追加：出費をバックエンドに送信し、フロント状態を同期する処理
+  // 💰 出費をバックエンドに送信し、フロント状態を同期する処理
   const handleAddExpense = async (planId: string, memo: string, amount: number) => {
     try {
       const res = await fetch(`http://127.0.0.1:8000/plans/${planId}/expenses`, {
@@ -178,7 +182,6 @@ export default function Home() {
         const result = await res.json();
         const newExpense = result.data;
 
-        // 1. 現在開いている詳細モーダル（selectedPlan）の状態をリロードなしで更新
         setSelectedPlan((prev) => {
           if (!prev) return null;
           return {
@@ -187,7 +190,6 @@ export default function Home() {
           };
         });
 
-        // 2. 親の一覧画面（tripPlans）のデータも同期して更新（不整合を防ぐ）
         setTripPlans((prevPlans) =>
           prevPlans.map((plan) =>
             plan.id === planId
@@ -204,7 +206,82 @@ export default function Home() {
     }
   };
 
-  // 💰 💡 モーダル内の現在選択されているプランの出費総額を自動計算
+  // 📸 💡 追加：画像URLをバックエンドに送信し、状態を同期する処理
+  const handleAddImageUrl = async (planId: string, url: string) => {
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/plans/${planId}/images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+
+      if (res.ok) {
+        // 1. 現在開いている詳細モーダルの画像URL状態を更新
+        setSelectedPlan((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            image_urls: [...(prev.image_urls || []), url]
+          };
+        });
+
+        // 2. 親の一覧画面データとも同期
+        setTripPlans((prevPlans) =>
+          prevPlans.map((plan) =>
+            plan.id === planId
+              ? { ...plan, image_urls: [...(plan.image_urls || []), url] }
+              : plan
+          )
+        );
+      } else {
+        alert("画像URLの登録に失敗しました。");
+      }
+    } catch (error) {
+      console.error("画像URL登録エラー:", error);
+      alert("通信エラーが発生しました。");
+    }
+  };
+
+  // 📸 💡 新設：端末から写真ファイルを選んでCloud Storageへ直接アップロードする処理
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, planId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 画像ファイル以外のアップロードを防ぐ
+    if (!file.type.startsWith("image/")) {
+      alert("画像ファイル（png, jpegなど）を選択してください。");
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+
+      // 1. Cloud Storage 内の保存先パスを決定 (重複を防ぐためタイムスタンプを付与)
+      const fileExtension = file.name.split(".").pop();
+      const uniqueFileName = `${Date.now()}.${fileExtension}`;
+      const storageRef = ref(storage, `plans/${planId}/${uniqueFileName}`);
+
+      // 2. ファイルを Cloud Storage にアップロード
+      await uploadBytes(storageRef, file);
+
+      // 3. アップロード成功した画像の「ダウンロード用一般公開URL」を取得
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // 4. 取得したURLを既存のバックエンドAPIに引き渡して、DBに保存する
+      await handleAddImageUrl(planId, downloadURL);
+
+      alert("写真をアップロードしてしおりに追加しました！");
+      // インプットの値をリセット
+      e.target.value = "";
+    } catch (error) {
+      console.error("Storageアップロードエラー:", error);
+      alert("写真のアップロード中にエラーが発生しました。ルールが公開されているか確認してください。");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // 💰 モーダル内の現在選択されているプランの出費総額を自動計算
   const totalExpense = selectedPlan?.expenses?.reduce((sum, item) => sum + item.amount, 0) || 0;
 
   if (loading) {
@@ -457,7 +534,7 @@ export default function Home() {
                 )}
               </div>
 
-              {/* 💰 💡 追加：出費管理セクション */}
+              {/* 💰 出費管理セクション */}
               <div className="mt-4 border-t border-gray-100 pt-6">
                 <h4 className="font-bold text-gray-800 text-sm mb-4 flex items-center gap-1.5 border-b border-gray-100 pb-1.5">
                   💰 出費の記録・合計計算
@@ -474,7 +551,7 @@ export default function Home() {
                     
                     if (memo && !isNaN(amount)) {
                       handleAddExpense(selectedPlan.id, memo, amount);
-                      form.reset(); // 送信後に入力欄をクリア
+                      form.reset();
                     }
                   }} 
                   className="flex gap-2 mb-4"
@@ -518,11 +595,104 @@ export default function Home() {
                     )}
                   </ul>
 
-                  {/* 🔥 金額の合計表示 */}
+                  {/* 金額の合計表示 */}
                   <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
                     <span className="text-xs font-bold text-gray-500">現在の出費合計:</span>
                     <span className="text-lg font-black text-sky-600">{totalExpense.toLocaleString()} 円</span>
                   </div>
+                </div>
+              </div>
+
+              {/* 📸 💡 画像管理セクション */}
+              <div className="mt-4 border-t border-gray-100 pt-6">
+                <h4 className="font-bold text-gray-800 text-sm mb-4 flex items-center gap-1.5 border-b border-gray-100 pb-1.5">
+                  📸 旅の思い出・画像の追加
+                </h4>
+
+                {/* 📸 💡 新設：端末から直接ファイルを選んでアップロードするUI */}
+                <div className="mb-4 bg-sky-50/40 border border-dashed border-sky-200 rounded-xl p-4">
+                  <label className="block text-xs font-bold text-sky-700 mb-2">
+                    📱 端末の写真ファイルをアップロード (Cloud Storage)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={isUploading}
+                    onChange={(e) => handleFileUpload(e, selectedPlan.id)}
+                    className="block w-full text-xs text-gray-500
+                      file:mr-4 file:py-1.5 file:px-3
+                      file:rounded-full file:border-0
+                      file:text-xs file:font-bold
+                      file:bg-sky-100 file:text-sky-700
+                      hover:file:bg-sky-200
+                      disabled:opacity-50 cursor-pointer"
+                  />
+                  {isUploading && (
+                    <p className="text-xs text-sky-600 font-semibold mt-2 animate-pulse flex items-center gap-1">
+                      ⏳ Cloud Storage へ写真を送信中...
+                    </p>
+                  )}
+                </div>
+
+                <div className="text-center text-gray-400 text-[10px] mb-3">— または外部URLを入力 —</div>
+
+                {/* 画像URL登録用フォーム */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const form = e.currentTarget;
+                    const formData = new FormData(form);
+                    const url = formData.get("url") as string;
+
+                    if (url && url.trim().startsWith("http")) {
+                      handleAddImageUrl(selectedPlan.id, url.trim());
+                      form.reset();
+                    } else {
+                      alert("有効な画像URL（http:// または https:// から始まるもの）を入力してください。");
+                    }
+                  }}
+                  className="flex gap-2 mb-4"
+                >
+                  <input
+                    type="url"
+                    name="url"
+                    placeholder="ネット上の画像リンク (例: https://images.unsplash.com/...)"
+                    required
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-800 focus:outline-sky-500"
+                  />
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-500 transition-colors whitespace-nowrap"
+                  >
+                    URLで追加
+                  </button>
+                </form>
+
+                {/* 登録済み画像ビューア */}
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  {selectedPlan.image_urls && selectedPlan.image_urls.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+                      {selectedPlan.image_urls.map((url, index) => (
+                        <div key={index} className="relative aspect-video w-full overflow-hidden rounded-lg bg-gray-200 shadow-sm border border-gray-200/60">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={url}
+                            alt={`ユーザー追加画像 ${index + 1}`}
+                            className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                            onError={(e) => {
+                              // リンク切れの際のフォールバック表示
+                              e.currentTarget.src = "https://images.unsplash.com/photo-1594322436404-5a0526db4d13?q=80&w=600&auto=format&fit=crop";
+                              e.currentTarget.title = "画像の読み込みに失敗しました";
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-xs italic text-center py-4">
+                      登録された画像はまだありません。端末の写真やURLで思い出を追加しましょう！
+                    </p>
+                  )}
                 </div>
               </div>
 
