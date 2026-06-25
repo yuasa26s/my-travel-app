@@ -12,7 +12,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY is not set in .env")
 
-# 2026年現在の推奨SDK（google-genai）のクライアント初期化
+# クライアント初期化
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 def generate_travel_plan(destination: str, concept: str) -> dict:
@@ -28,42 +28,51 @@ def generate_travel_plan(destination: str, concept: str) -> dict:
     【目的地】: {destination}
     【旅のテーマ・やりたいこと】: {concept}
     
-    必ず以下の構造のJSONフォーマットのみを返却してください。
+    必ず指定された構造のJSONフォーマットのみを返却してください。
     余計な挨拶文や、Markdownの ```json などの囲みは一切含めず、純粋なJSON文字列のみを出力してください。
-    
-    {{
-        "title": "旅行プランのタイトル（例: 贅沢海鮮と絶景を巡る北海道日帰り旅）",
-        "destination": "{destination}",
-        "summary": "この旅の全体的な見どころやおすすめポイントの要約文（200文字程度）",
-        "schedule": [
-            {{
-                "time": "09:00",
-                "spot": "スポット名（例: 函館朝市）",
-                "description": "そこでの具体的な過ごし方や、おすすめのメニュー・体験内容（詳細に詳しく書くこと）"
-            }},
-            {{
-                "time": "12:00",
-                "spot": "スポット名",
-                "description": "詳細な説明"
-            }}
-        ],
-        "souvenirs": [
-            {{
-                "name": "おすすめのお土産名",
-                "reason": "なぜおすすめなのか、どこで買えるかなどの詳細な理由"
-            }}
-        ]
-    }}
     """
 
     try:
-        # 最新の標準モデルである gemini-2.5-flash を使用
+        # 🤖 モデル指定を最新SDKで確実に認識される 'gemini-2.5-flash' に戻し、
+        # 🛠️ 構造化出力（response_schema）で強制指定します
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
-            # ResponseをJSONオブジェクトに固定する設定
             config=types.GenerateContentConfig(
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                # レスポンスのデータ構造を明示的に強制する設定
+                response_schema=types.Schema(
+                    type=types.Type.OBJECT,
+                    properties={
+                        "title": types.Schema(type=types.Type.STRING),
+                        "destination": types.Schema(type=types.Type.STRING),
+                        "summary": types.Schema(type=types.Type.STRING),
+                        "schedule": types.Schema(
+                            type=types.Type.ARRAY,
+                            items=types.Schema(
+                                type=types.Type.OBJECT,
+                                properties={
+                                    "time": types.Schema(type=types.Type.STRING),
+                                    "spot": types.Schema(type=types.Type.STRING),
+                                    "description": types.Schema(type=types.Type.STRING),
+                                },
+                                required=["time", "spot", "description"]
+                            )
+                        ),
+                        "souvenirs": types.Schema(
+                            type=types.Type.ARRAY,
+                            items=types.Schema(
+                                type=types.Type.OBJECT,
+                                properties={
+                                    "name": types.Schema(type=types.Type.STRING),
+                                    "reason": types.Schema(type=types.Type.STRING),
+                                },
+                                required=["name", "reason"]
+                            )
+                        )
+                    },
+                    required=["title", "destination", "summary", "schedule", "souvenirs"]
+                )
             )
         )
         
@@ -73,7 +82,7 @@ def generate_travel_plan(destination: str, concept: str) -> dict:
 
     except Exception as e:
         print(f"[ERROR] Gemini APIの呼び出しに失敗しました: {e}")
-        # 万が一パースエラーなどが発生した際のセーフティネット
+        # 万が一エラーが発生した際のセーフティネット
         return {
             "title": f"{destination}の旅",
             "destination": destination,
